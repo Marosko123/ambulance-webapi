@@ -61,6 +61,20 @@ spec:
         ports:
         - name: webapi-port
           containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 6
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          failureThreshold: 3
         env:
           - name: AMBULANCE_API_ENVIRONMENT
             value: production
