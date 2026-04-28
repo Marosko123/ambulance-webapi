@@ -22,18 +22,11 @@ func (o *implAmbulanceWaitingListAPI) CreateWaitingListEntry(c *gin.Context) {
 		var entry WaitingListEntry
 
 		if err := c.ShouldBindJSON(&entry); err != nil {
-			return nil, gin.H{
-				"status":  http.StatusBadRequest,
-				"message": "Invalid request body",
-				"error":   err.Error(),
-			}, http.StatusBadRequest
+			return nil, gin.H{"error": err.Error()}, http.StatusBadRequest
 		}
 
 		if entry.PatientId == "" {
-			return nil, gin.H{
-				"status":  http.StatusBadRequest,
-				"message": "Patient ID is required",
-			}, http.StatusBadRequest
+			return nil, gin.H{"error": "patientId is required"}, http.StatusBadRequest
 		}
 
 		if entry.Id == "" || entry.Id == "@new" {
@@ -45,23 +38,17 @@ func (o *implAmbulanceWaitingListAPI) CreateWaitingListEntry(c *gin.Context) {
 		})
 
 		if conflictIndx >= 0 {
-			return nil, gin.H{
-				"status":  http.StatusConflict,
-				"message": "Entry already exists",
-			}, http.StatusConflict
+			return nil, gin.H{"error": "entry already exists"}, http.StatusConflict
 		}
 
 		ambulance.WaitingList = append(ambulance.WaitingList, entry)
 		ambulance.reconcileWaitingList()
-		// entry was copied by value return reconciled value from the list
+		// entry je kopírovaný hodnotou - vrátime reconciled hodnotu zo zoznamu
 		entryIndx := slices.IndexFunc(ambulance.WaitingList, func(waiting WaitingListEntry) bool {
 			return entry.Id == waiting.Id
 		})
 		if entryIndx < 0 {
-			return nil, gin.H{
-				"status":  http.StatusInternalServerError,
-				"message": "Failed to save entry",
-			}, http.StatusInternalServerError
+			return nil, gin.H{"error": "failed to save entry"}, http.StatusInternalServerError
 		}
 		return ambulance, ambulance.WaitingList[entryIndx], http.StatusOK
 	})
@@ -73,10 +60,7 @@ func (o *implAmbulanceWaitingListAPI) DeleteWaitingListEntry(c *gin.Context) {
 		entryId := c.Param("entryId")
 
 		if entryId == "" {
-			return nil, gin.H{
-				"status":  http.StatusBadRequest,
-				"message": "Entry ID is required",
-			}, http.StatusBadRequest
+			return nil, gin.H{"error": "entryId is required"}, http.StatusBadRequest
 		}
 
 		entryIndx := slices.IndexFunc(ambulance.WaitingList, func(waiting WaitingListEntry) bool {
@@ -84,10 +68,7 @@ func (o *implAmbulanceWaitingListAPI) DeleteWaitingListEntry(c *gin.Context) {
 		})
 
 		if entryIndx < 0 {
-			return nil, gin.H{
-				"status":  http.StatusNotFound,
-				"message": "Entry not found",
-			}, http.StatusNotFound
+			return nil, gin.H{"error": "entry not found"}, http.StatusNotFound
 		}
 
 		ambulance.WaitingList = append(ambulance.WaitingList[:entryIndx], ambulance.WaitingList[entryIndx+1:]...)
@@ -114,10 +95,7 @@ func (o *implAmbulanceWaitingListAPI) GetWaitingListEntry(c *gin.Context) {
 		entryId := c.Param("entryId")
 
 		if entryId == "" {
-			return nil, gin.H{
-				"status":  http.StatusBadRequest,
-				"message": "Entry ID is required",
-			}, http.StatusBadRequest
+			return nil, gin.H{"error": "entryId is required"}, http.StatusBadRequest
 		}
 
 		entryIndx := slices.IndexFunc(ambulance.WaitingList, func(waiting WaitingListEntry) bool {
@@ -125,13 +103,10 @@ func (o *implAmbulanceWaitingListAPI) GetWaitingListEntry(c *gin.Context) {
 		})
 
 		if entryIndx < 0 {
-			return nil, gin.H{
-				"status":  http.StatusNotFound,
-				"message": "Entry not found",
-			}, http.StatusNotFound
+			return nil, gin.H{"error": "entry not found"}, http.StatusNotFound
 		}
 
-		// return nil ambulance - no need to update it in db
+		// nil ambulance - DB update netreba
 		return nil, ambulance.WaitingList[entryIndx], http.StatusOK
 	})
 }
@@ -142,20 +117,13 @@ func (o *implAmbulanceWaitingListAPI) UpdateWaitingListEntry(c *gin.Context) {
 		var entry WaitingListEntry
 
 		if err := c.ShouldBindJSON(&entry); err != nil {
-			return nil, gin.H{
-				"status":  http.StatusBadRequest,
-				"message": "Invalid request body",
-				"error":   err.Error(),
-			}, http.StatusBadRequest
+			return nil, gin.H{"error": err.Error()}, http.StatusBadRequest
 		}
 
 		entryId := c.Param("entryId")
 
 		if entryId == "" {
-			return nil, gin.H{
-				"status":  http.StatusBadRequest,
-				"message": "Entry ID is required",
-			}, http.StatusBadRequest
+			return nil, gin.H{"error": "entryId is required"}, http.StatusBadRequest
 		}
 
 		entryIndx := slices.IndexFunc(ambulance.WaitingList, func(waiting WaitingListEntry) bool {
@@ -163,10 +131,7 @@ func (o *implAmbulanceWaitingListAPI) UpdateWaitingListEntry(c *gin.Context) {
 		})
 
 		if entryIndx < 0 {
-			return nil, gin.H{
-				"status":  http.StatusNotFound,
-				"message": "Entry not found",
-			}, http.StatusNotFound
+			return nil, gin.H{"error": "entry not found"}, http.StatusNotFound
 		}
 
 		if entry.PatientId != "" {

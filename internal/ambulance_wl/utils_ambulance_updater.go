@@ -15,25 +15,13 @@ type ambulanceUpdater = func(
 func updateAmbulanceFunc(ctx *gin.Context, updater ambulanceUpdater) {
 	value, exists := ctx.Get("db_service")
 	if !exists {
-		ctx.JSON(
-			http.StatusInternalServerError,
-			gin.H{
-				"status":  "Internal Server Error",
-				"message": "db_service not found",
-				"error":   "db_service not found",
-			})
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "db_service not found in context"})
 		return
 	}
 
 	db, ok := value.(db_service.DbService[Ambulance])
 	if !ok {
-		ctx.JSON(
-			http.StatusInternalServerError,
-			gin.H{
-				"status":  "Internal Server Error",
-				"message": "db_service context is not of type db_service.DbService",
-				"error":   "cannot cast db_service context to db_service.DbService",
-			})
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "db_service has unexpected type"})
 		return
 	}
 
@@ -45,34 +33,10 @@ func updateAmbulanceFunc(ctx *gin.Context, updater ambulanceUpdater) {
 	case nil:
 		// continue
 	case db_service.ErrNotFound:
-		ctx.JSON(
-			http.StatusNotFound,
-			gin.H{
-				"status":  "Not Found",
-				"message": "Ambulance not found",
-				"error":   err.Error(),
-			},
-		)
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "ambulance not found"})
 		return
 	default:
-		ctx.JSON(
-			http.StatusBadGateway,
-			gin.H{
-				"status":  "Bad Gateway",
-				"message": "Failed to load ambulance from database",
-				"error":   err.Error(),
-			})
-		return
-	}
-
-	if !ok {
-		ctx.JSON(
-			http.StatusInternalServerError,
-			gin.H{
-				"status":  "Internal Server Error",
-				"message": "Failed to cast ambulance from database",
-				"error":   "Failed to cast ambulance from database",
-			})
+		ctx.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -80,8 +44,6 @@ func updateAmbulanceFunc(ctx *gin.Context, updater ambulanceUpdater) {
 
 	if updatedAmbulance != nil {
 		err = db.UpdateDocument(ctx, ambulanceId, updatedAmbulance)
-	} else {
-		err = nil // redundant but for clarity
 	}
 
 	switch err {
@@ -92,22 +54,8 @@ func updateAmbulanceFunc(ctx *gin.Context, updater ambulanceUpdater) {
 			ctx.AbortWithStatus(status)
 		}
 	case db_service.ErrNotFound:
-		ctx.JSON(
-			http.StatusNotFound,
-			gin.H{
-				"status":  "Not Found",
-				"message": "Ambulance was deleted while processing the request",
-				"error":   err.Error(),
-			},
-		)
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "ambulance was deleted during update"})
 	default:
-		ctx.JSON(
-			http.StatusBadGateway,
-			gin.H{
-				"status":  "Bad Gateway",
-				"message": "Failed to update ambulance in database",
-				"error":   err.Error(),
-			})
+		ctx.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 	}
-
 }
