@@ -15,42 +15,30 @@ func NewAmbulancesApi() AmbulancesAPI {
 	return &implAmbulancesAPI{}
 }
 
-// CreateAmbulance - Saves new ambulance definition
-func (o *implAmbulancesAPI) CreateAmbulance(c *gin.Context) {
+func resolveAmbulanceDb(c *gin.Context) (db_service.DbService[Ambulance], bool) {
 	value, exists := c.Get("db_service")
 	if !exists {
-		c.JSON(
-			http.StatusInternalServerError,
-			gin.H{
-				"status":  "Internal Server Error",
-				"message": "db not found",
-				"error":   "db not found",
-			})
-		return
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "db_service not found in context"})
+		return nil, false
 	}
-
 	db, ok := value.(db_service.DbService[Ambulance])
 	if !ok {
-		c.JSON(
-			http.StatusInternalServerError,
-			gin.H{
-				"status":  "Internal Server Error",
-				"message": "db context is not of required type",
-				"error":   "cannot cast db context to db_service.DbService",
-			})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "db_service has unexpected type"})
+		return nil, false
+	}
+	return db, true
+}
+
+// CreateAmbulance - Saves new ambulance definition
+func (o *implAmbulancesAPI) CreateAmbulance(c *gin.Context) {
+	db, ok := resolveAmbulanceDb(c)
+	if !ok {
 		return
 	}
 
 	ambulance := Ambulance{}
-	err := c.BindJSON(&ambulance)
-	if err != nil {
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{
-				"status":  "Bad Request",
-				"message": "Invalid request body",
-				"error":   err.Error(),
-			})
+	if err := c.BindJSON(&ambulance); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -58,58 +46,22 @@ func (o *implAmbulancesAPI) CreateAmbulance(c *gin.Context) {
 		ambulance.Id = uuid.New().String()
 	}
 
-	err = db.CreateDocument(c, ambulance.Id, &ambulance)
+	err := db.CreateDocument(c, ambulance.Id, &ambulance)
 
 	switch err {
 	case nil:
-		c.JSON(
-			http.StatusCreated,
-			ambulance,
-		)
+		c.JSON(http.StatusCreated, ambulance)
 	case db_service.ErrConflict:
-		c.JSON(
-			http.StatusConflict,
-			gin.H{
-				"status":  "Conflict",
-				"message": "Ambulance already exists",
-				"error":   err.Error(),
-			},
-		)
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "ambulance already exists"})
 	default:
-		c.JSON(
-			http.StatusBadGateway,
-			gin.H{
-				"status":  "Bad Gateway",
-				"message": "Failed to create ambulance in database",
-				"error":   err.Error(),
-			},
-		)
+		c.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 	}
 }
 
 // DeleteAmbulance - Deletes specific ambulance
 func (o *implAmbulancesAPI) DeleteAmbulance(c *gin.Context) {
-	value, exists := c.Get("db_service")
-	if !exists {
-		c.JSON(
-			http.StatusInternalServerError,
-			gin.H{
-				"status":  "Internal Server Error",
-				"message": "db_service not found",
-				"error":   "db_service not found",
-			})
-		return
-	}
-
-	db, ok := value.(db_service.DbService[Ambulance])
+	db, ok := resolveAmbulanceDb(c)
 	if !ok {
-		c.JSON(
-			http.StatusInternalServerError,
-			gin.H{
-				"status":  "Internal Server Error",
-				"message": "db_service context is not of type db_service.DbService",
-				"error":   "cannot cast db_service context to db_service.DbService",
-			})
 		return
 	}
 
@@ -120,21 +72,8 @@ func (o *implAmbulancesAPI) DeleteAmbulance(c *gin.Context) {
 	case nil:
 		c.AbortWithStatus(http.StatusNoContent)
 	case db_service.ErrNotFound:
-		c.JSON(
-			http.StatusNotFound,
-			gin.H{
-				"status":  "Not Found",
-				"message": "Ambulance not found",
-				"error":   err.Error(),
-			},
-		)
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "ambulance not found"})
 	default:
-		c.JSON(
-			http.StatusBadGateway,
-			gin.H{
-				"status":  "Bad Gateway",
-				"message": "Failed to delete ambulance from database",
-				"error":   err.Error(),
-			})
+		c.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 	}
 }
